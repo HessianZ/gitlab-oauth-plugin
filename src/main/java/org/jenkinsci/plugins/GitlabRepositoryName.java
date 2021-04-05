@@ -64,7 +64,13 @@ public class GitlabRepositoryName {
         Pattern.compile("https?://[^/]+@([^/]+)/([^/]+)/([^/]+)/?"),
         Pattern.compile("https?://([^/]+)/([^/]+)/([^/]+)/?"),
         Pattern.compile("git://([^/]+)/([^/]+)/([^/]+)/?"),
-        Pattern.compile("ssh://git@([^/]+)/([^/]+)/([^/]+)/?")
+        Pattern.compile("ssh://git@([^/]+)/([^/]+)/([^/]+)/?"),
+
+        /**
+         * support project in subgroup
+        */
+        Pattern.compile("^git://([^/]+)/(.+?)/([^/]+)\\.git$"),
+        Pattern.compile("^git@(.+):(.+?)/([^/]+)\\.git$")
     };
 
     /**

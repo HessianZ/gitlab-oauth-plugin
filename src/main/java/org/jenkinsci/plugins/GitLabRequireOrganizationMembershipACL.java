@@ -102,7 +102,7 @@ public class GitLabRequireOrganizationMembershipACL extends ACL {
                     if(hasRepositoryPermission(authenticationToken, permission)) {
                         log.finest("Granting Authenticated User " + permission.getId() +
                             " permission on project " + project.getName() +
-                            "to user " + candidateName);
+                            " to user " + candidateName);
                         return true;
                     }
                 } else {
@@ -110,7 +110,7 @@ public class GitLabRequireOrganizationMembershipACL extends ACL {
                         if (checkReadPermission(permission)) {
                             log.finest("Granting Authenticated User read permission " +
                                 "on project " + project.getName() +
-                                "to user " + candidateName);
+                                " to user " + candidateName);
                             return true;
                         }
                     }
@@ -270,7 +270,22 @@ public class GitLabRequireOrganizationMembershipACL extends ACL {
                 authenticationToken.isPublicRepository(repositoryName)) {
             return true;
         } else {
-            return authenticationToken.hasRepositoryPermission(repositoryName);
+            if (!authenticationToken.hasRepositoryPermission(repositoryName)) {
+                return false;
+            }
+
+            boolean isMaintainerPermission = permission.equals(Item.BUILD) ||
+                    permission.equals(Item.CANCEL) ||
+                    permission.equals(Item.DELETE) ||
+                    permission.equals(Item.CONFIGURE) ||
+                    permission.equals(Item.WIPEOUT) ||
+                    permission.equals(Item.WORKSPACE);
+
+            if (isMaintainerPermission) {
+                return authenticationToken.hasRepositoryMaintainerPermission(repositoryName);
+            } else {
+                return true;
+            }
         }
     }
 

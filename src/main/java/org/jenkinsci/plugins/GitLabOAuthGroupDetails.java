@@ -10,6 +10,8 @@ import org.gitlab.api.models.GitlabGroup;
 import hudson.security.GroupDetails;
 
 import java.net.URI;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Represent a group from Gitlab as a group in Jenkins terms.
@@ -31,6 +33,7 @@ public class GitLabOAuthGroupDetails extends GroupDetails {
 
     private final GitlabGroup gitlabGroup;
     static final String ORG_TEAM_SEPARATOR = "*";
+    static final Pattern REGEX_GROUP_FULL_PATH = Pattern.compile(".*/groups/(.*)$");
 
     /**
     * Group based on organization name
@@ -47,6 +50,10 @@ public class GitLabOAuthGroupDetails extends GroupDetails {
     @Override
     public String getName() {
         if (gitlabGroup != null) {
+            Matcher matcher = REGEX_GROUP_FULL_PATH.matcher(gitlabGroup.getWebUrl());
+            if (matcher.find()) {
+                return matcher.group(1);
+            }
             return gitlabGroup.getPath();
         }
         return null;

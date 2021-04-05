@@ -48,9 +48,7 @@ import org.acegisecurity.providers.AbstractAuthenticationToken;
 import org.apache.commons.collections.CollectionUtils;
 import org.gitlab.api.GitlabAPI;
 import org.gitlab.api.TokenType;
-import org.gitlab.api.models.GitlabGroup;
-import org.gitlab.api.models.GitlabProject;
-import org.gitlab.api.models.GitlabUser;
+import org.gitlab.api.models.*;
 
 import hudson.security.SecurityRealm;
 import jenkins.model.Jenkins;
@@ -94,6 +92,9 @@ public class GitLabAuthenticationToken extends AbstractAuthenticationToken {
 	private static final Cache<String, List<GitlabProject>> groupRepositoriesCache = CacheBuilder.newBuilder()
 			.expireAfterWrite(1, TimeUnit.HOURS).build();
 
+	private static final Cache<String, GitlabAccessLevel> projectAccessLevelCache = CacheBuilder.newBuilder()
+			.expireAfterWrite(1, TimeUnit.HOURS).build();
+
 	private final List<GrantedAuthority> authorities = new ArrayList<>();
 
 	public GitLabAuthenticationToken(String accessToken, String gitlabServer, TokenType tokenType) throws IOException {
@@ -120,12 +121,19 @@ public class GitLabAuthenticationToken extends AbstractAuthenticationToken {
 			// https://developer.gitlab.com/v3/orgs/teams/#list-user-teams
 			List<GitlabGroup> myTeams = gitLabAPI.getGroups();
 			for (GitlabGroup group : myTeams) {
-				LOGGER.log(Level.FINE, "Fetch teams for user " + userName + " in organization " + group.getName());
 
 				GitLabOAuthGroupDetails gitLabOAuthGroupDetails = new GitLabOAuthGroupDetails(group);
+				LOGGER.log(Level.FINE, "Fetch teams for user " + userName + " in organization " + group.getName() + " path: " + gitLabOAuthGroupDetails.getName());
 
 				authorities.add(gitLabOAuthGroupDetails.getAuth());
 			}
+
+			// Clear project ACL cache after login
+			projectAccessLevelCache.asMap().keySet().forEach(key -> {
+				if (key.endsWith(":" + me.getId())) {
+					projectAccessLevelCache.invalidate(key);
+				}
+			});
 		}
 	}
 
@@ -137,6 +145,7 @@ public class GitLabAuthenticationToken extends AbstractAuthenticationToken {
 		repositoryCollaboratorsCache.invalidateAll();
 		repositoriesByUserCache.invalidateAll();
 		groupRepositoriesCache.invalidateAll();
+		projectAccessLevelCache.invalidateAll();
 	}
 
 	/**
@@ -197,7 +206,7 @@ public class GitLabAuthenticationToken extends AbstractAuthenticationToken {
 					List<GitlabGroup> groups = gitLabAPI.getGroups();
 					Set<String> groupsNames = new HashSet<String>();
 					for (GitlabGroup group : groups) {
-						groupsNames.add(group.getName());
+						groupsNames.add(new GitLabOAuthGroupDetails(group).getName());
 					}
 					return groupsNames;
 				}
@@ -361,6 +370,28 @@ public class GitLabAuthenticationToken extends AbstractAuthenticationToken {
 		} catch (ExecutionException e) {
 			LOGGER.log(Level.SEVERE, "an exception was thrown", e);
 			throw new RuntimeException("authorization failed for user = " + getName(), e);
+		}
+	}
+
+	public boolean hasRepositoryMaintainerPermission(String repositoryName) {
+        GitlabAccessLevel projectAccessLevel = getGitlabProjectAccessLevel(repositoryName);
+        return projectAccessLevel == GitlabAccessLevel.Master || projectAccessLevel == GitlabAccessLevel.Owner;
+	}
+
+	public GitlabAccessLevel getGitlabProjectAccessLevel(String repositoryName) {
+
+		try {
+			String cacheKey = repositoryName + ":" + me.getId();
+			return projectAccessLevelCache.get(cacheKey, () -> {
+				GitlabProject repository = loadRepository(repositoryName);
+				String url = GitlabProject.URL + "/" + repository.getId() + GitlabProjectMember.URL + "/" + me.getId();
+				GitlabProjectMember projectMember = gitLabAPI.retrieve().to(url, GitlabProjectMember.class);
+
+				return projectMember.getAccessLevel();
+			});
+		} catch (ExecutionException e) {
+			LOGGER.log(Level.SEVERE, "an exception was thrown", e);
+			return null;
 		}
 	}
 }
