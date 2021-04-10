@@ -384,10 +384,16 @@ public class GitLabAuthenticationToken extends AbstractAuthenticationToken {
 			String cacheKey = repositoryName + ":" + me.getId();
 			return projectAccessLevelCache.get(cacheKey, () -> {
 				GitlabProject repository = loadRepository(repositoryName);
-				String url = GitlabProject.URL + "/" + repository.getId() + GitlabProjectMember.URL + "/" + me.getId();
-				GitlabProjectMember projectMember = gitLabAPI.retrieve().to(url, GitlabProjectMember.class);
+				String url = GitlabProject.URL + "/" + repository.getId() + GitlabProjectMember.URL + "/all";
+				GitlabProjectMember[] projectMembers = gitLabAPI.retrieve().to(url, GitlabProjectMember[].class);
 
-				return projectMember.getAccessLevel();
+				for (GitlabProjectMember member : projectMembers) {
+					if (me.getId().equals(member.getId())) {
+						return member.getAccessLevel();
+					}
+				}
+
+				return null;
 			});
 		} catch (ExecutionException e) {
 			LOGGER.log(Level.SEVERE, "an exception was thrown", e);
