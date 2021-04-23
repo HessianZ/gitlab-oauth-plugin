@@ -111,6 +111,7 @@ public class GitLabAuthenticationToken extends AbstractAuthenticationToken {
 		this.userName = this.me.getUsername();
 		authorities.add(SecurityRealm.AUTHENTICATED_AUTHORITY);
 		Jenkins jenkins = Jenkins.getInstance();
+		LOGGER.log(Level.FINE, "Jenkins instance: " + (jenkins == null ? "null" : jenkins.toString() + "  " + jenkins.getSecurityRealm().getClass().getName()));
 		if (jenkins != null && jenkins.getSecurityRealm() instanceof GitLabSecurityRealm) {
 			if (myRealm == null) {
 				myRealm = (GitLabSecurityRealm) jenkins.getSecurityRealm();
@@ -387,13 +388,17 @@ public class GitLabAuthenticationToken extends AbstractAuthenticationToken {
 				String url = GitlabProject.URL + "/" + repository.getId() + GitlabProjectMember.URL + "/all";
 				GitlabProjectMember[] projectMembers = gitLabAPI.retrieve().to(url, GitlabProjectMember[].class);
 
+				GitlabAccessLevel userAccessLevel = null;
+
 				for (GitlabProjectMember member : projectMembers) {
 					if (me.getId().equals(member.getId())) {
-						return member.getAccessLevel();
+						if (userAccessLevel == null || userAccessLevel.accessValue < member.getAccessLevel().accessValue) {
+							userAccessLevel = member.getAccessLevel();
+						}
 					}
 				}
 
-				return null;
+				return userAccessLevel;
 			});
 		} catch (ExecutionException e) {
 			LOGGER.log(Level.SEVERE, "an exception was thrown", e);

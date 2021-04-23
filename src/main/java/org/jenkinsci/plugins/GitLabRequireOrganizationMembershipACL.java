@@ -74,6 +74,7 @@ public class GitLabRequireOrganizationMembershipACL extends ACL {
      */
     @Override
     public boolean hasPermission(Authentication a, Permission permission) {
+        log.finest("Authentication: " + (a == null ? "null" : a.getName()) + " URL: " + requestURI() + " Project: " + (project == null ? "null" : project.getFullName()) + " Permission: " + permission.toString());
         if (a != null && a instanceof GitLabAuthenticationToken) {
             if (!a.isAuthenticated()) {
 				return false;
@@ -278,6 +279,7 @@ public class GitLabRequireOrganizationMembershipACL extends ACL {
                     permission.equals(Item.CANCEL) ||
                     permission.equals(Item.DELETE) ||
                     permission.equals(Item.CONFIGURE) ||
+                    permission.equals(Item.EXTENDED_READ) ||
                     permission.equals(Item.WIPEOUT) ||
                     permission.equals(Item.WORKSPACE);
 
